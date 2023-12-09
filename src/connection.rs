@@ -1,4 +1,3 @@
-use diesel::result::Error;
 use diesel::sqlite::SqliteConnection;
 use dotenvy::dotenv;
 use std::env;
