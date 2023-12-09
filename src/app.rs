@@ -106,7 +106,7 @@ mod tests {
     fn get_conn() -> Result<SqliteConnection, Box<dyn std::error::Error>> {
         dotenv().ok();
 
-        let database_url = env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
+        let database_url = env::var("TEST_DATABASE_FILE").expect("TEST_DATABASE_FILE must be set");
 
         Connection::new(Some(&database_url))
             .state
