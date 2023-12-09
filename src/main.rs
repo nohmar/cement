@@ -14,5 +14,9 @@ fn main() {
     let connection = Connection::new(None);
     let connection_state = &mut connection.state.unwrap();
 
-    println!("{}", app.output_from_args(connection_state).unwrap());
+    println!(
+        "{}",
+        app.output_from_args(connection_state)
+            .unwrap_or("Something went wrong.".to_string())
+    );
 }
