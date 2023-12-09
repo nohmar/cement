@@ -2,9 +2,11 @@ use chrono::prelude::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::sqlite::Sqlite;
 
+use serde::{Deserialize, Serialize};
+
 use crate::schema::idioms;
 
-#[derive(Debug, Queryable, Selectable)]
+#[derive(Serialize, Deserialize, Debug, Queryable, Selectable)]
 #[diesel(table_name = idioms)]
 #[diesel(check_for_backend(Sqlite))]
 pub struct Idiom {
