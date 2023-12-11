@@ -109,15 +109,24 @@ impl<'a> App<'a> {
 
                 Ok(json)
             }
-            false => match self.store(connection) {
-                Ok(_) => {
-                    let result = "Stored phrase ".to_owned() + self.cli.phrase.as_ref().unwrap();
-                    Ok(result.to_string())
+            false => match self.cli.destroy.as_ref() {
+                Some(_) => {
+                    let _ = self.destroy(connection);
+                    Ok("".to_string())
                 }
-                Err(error) => {
-                    let message = "Something went wrong: ".to_owned() + &error.to_string();
+                None => {
+                    return match self.store(connection) {
+                        Ok(_) => {
+                            let result =
+                                "Stored phrase ".to_owned() + self.cli.phrase.as_ref().unwrap();
+                            Ok(result.to_string())
+                        }
+                        Err(error) => {
+                            let message = "Something went wrong: ".to_owned() + &error.to_string();
 
-                    Err(std::io::Error::new(ErrorKind::Other, message))
+                            Err(std::io::Error::new(ErrorKind::Other, message))
+                        }
+                    };
                 }
             },
         }
@@ -244,5 +253,24 @@ mod tests {
 
         app.cli = Cli::parse_from(vec!["", "-d", &new_phrase]);
         let _ = app.destroy(conn);
+    }
+
+    #[test]
+    fn destory_flag() -> Result<(), Box<dyn std::error::Error>> {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Unable to get time since Unix epoch.")
+            .as_secs()
+            .to_string();
+
+        let new_phrase = "new-phrase-".to_string() + &now;
+
+        let args = Some(vec!["", "-d", &new_phrase]);
+        let app = App::new(args);
+        let conn = &mut get_conn().unwrap();
+
+        app.output_from_args(conn)?;
+
+        Ok(())
     }
 }
