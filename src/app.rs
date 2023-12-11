@@ -19,6 +19,7 @@ impl<'a> App<'a> {
         let mut app = App {
             cli: Cli {
                 list: false,
+                destroy: None,
                 example: None,
                 phrase: None,
             },
