@@ -58,6 +58,39 @@ impl<'a> App<'a> {
             .execute(connection)
     }
 
+    pub fn destroy(
+        &self,
+        connection: &mut SqliteConnection,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::schema::idioms::dsl::*;
+        use diesel::prelude::*;
+
+        let idiom_to_delete = self.cli.destroy.as_ref().unwrap();
+
+        let existing_idiom = idioms
+            .filter(phrase.eq(idiom_to_delete))
+            .select(Idiom::as_select())
+            .first(connection);
+
+        match existing_idiom {
+            Ok(result) => {
+                diesel::delete(idioms.filter(phrase.eq(idiom_to_delete))).execute(connection)?;
+
+                println!(
+                    "Deleted {}, {}",
+                    result.phrase,
+                    result.example.unwrap_or("no example found.".to_string())
+                );
+
+                Ok(())
+            }
+            Err(_) => {
+                println!("{} doesn't exist.", idiom_to_delete);
+                Ok(())
+            }
+        }
+    }
+
     pub fn output_from_args(
         &self,
         connection: &mut SqliteConnection,
@@ -142,7 +175,7 @@ mod tests {
 
         let conn = &mut get_conn().unwrap();
 
-        let _ = app.store(conn);
+        let result = app.store(conn);
 
         let query_results = idioms
             .filter(phrase.eq(new_phrase))
@@ -163,5 +196,53 @@ mod tests {
         app.output_from_args(conn)?;
 
         Ok(())
+    }
+
+    #[test]
+    fn destroy_an_existing_idiom() {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Unable to get time since Unix epoch.")
+            .as_secs()
+            .to_string();
+
+        let new_phrase = "new-phrase-".to_string() + &now;
+
+        let mut app = App::new(Some(vec![
+            "",
+            &new_phrase,
+            "-e",
+            "An example of an example.",
+        ]));
+
+        let conn = &mut get_conn().unwrap();
+
+        let _ = app.store(conn);
+
+        app.cli = Cli::parse_from(vec!["", "-d", &new_phrase]);
+        let _ = app.destroy(conn);
+    }
+
+    #[test]
+    fn destroy_fails_without_existence() {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Unable to get time since Unix epoch.")
+            .as_secs()
+            .to_string();
+
+        let new_phrase = "new-phrase-".to_string() + &now;
+
+        let mut app = App::new(Some(vec![
+            "",
+            &new_phrase,
+            "-e",
+            "An example of an example.",
+        ]));
+
+        let conn = &mut get_conn().unwrap();
+
+        app.cli = Cli::parse_from(vec!["", "-d", &new_phrase]);
+        let _ = app.destroy(conn);
     }
 }
