@@ -17,18 +17,23 @@ impl Connection {
             None => Self::default(),
         };
 
-        connection.connect();
-        connection
+        match connection.connect() {
+            Ok(_) => connection,
+            Err(error) => {
+                println!("Connection Error: {}", error);
+                connection
+            }
+        }
     }
 
-    fn connect(&mut self) {
+    fn connect(&mut self) -> Result<(), diesel::ConnectionError> {
         use diesel::prelude::*;
 
         let file = &self.file;
-        let connection =
-            SqliteConnection::establish(&file).expect("Could not connect to the database.");
+        let connection = SqliteConnection::establish(file)?;
 
         self.state = Some(connection);
+        Ok(())
     }
 }
 
@@ -61,8 +66,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn panics_with_bad_url() {
+    fn doesnt_panic_with_bad_url() {
         let url = Some("uh_oh\0");
         let _ = Connection::new(url);
     }

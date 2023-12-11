@@ -22,7 +22,7 @@ impl<'a> App<'a> {
                 example: None,
                 phrase: None,
             },
-            args: args,
+            args,
         };
 
         let cli = app.parse_args();
@@ -49,11 +49,7 @@ impl<'a> App<'a> {
             .unwrap()
             .to_string();
 
-        let example = match self.cli.example.as_ref() {
-            Some(e) => Some(e.to_string()),
-            _ => None,
-        };
-
+        let example = self.cli.example.as_ref().map(|example| example.to_string());
         let new_idiom = NewIdiom { phrase, example };
 
         diesel::insert_into(idioms::table)
@@ -81,7 +77,7 @@ impl<'a> App<'a> {
             }
             false => match self.store(connection) {
                 Ok(_) => {
-                    let result = "Stored phrase ".to_owned() + &self.cli.phrase.as_ref().unwrap();
+                    let result = "Stored phrase ".to_owned() + self.cli.phrase.as_ref().unwrap();
                     Ok(result.to_string())
                 }
                 Err(error) => {
