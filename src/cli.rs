@@ -44,6 +44,18 @@ mod tests {
 
         assert_eq!(result, expected);
 
+        let args = vec!["", "-l"];
+        let result = Cli::parse_from(args);
+
+        let expected = Cli {
+            phrase: None,
+            example: None,
+            list: true,
+            destroy: None,
+        };
+
+        assert_eq!(result, expected);
+
         let args = vec!["", "-d", "hello"];
         let result = Cli::parse_from(args);
 
