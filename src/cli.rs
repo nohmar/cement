@@ -13,8 +13,11 @@ pub struct Cli {
     #[arg(short, long, value_name = "EXAMPLE")]
     pub example: Option<String>,
 
-    #[arg(short, long)]
+    #[arg(short, long, conflicts_with = "destroy")]
     pub list: bool,
+
+    #[arg(short, long, conflicts_with = "list")]
+    pub destroy: Option<String>,
 }
 
 impl PartialEq for Cli {
@@ -36,6 +39,31 @@ mod tests {
             phrase: Some("hints".to_string()),
             example: Some("Give the compiler some hints.".to_string()),
             list: false,
+            destroy: None,
+        };
+
+        assert_eq!(result, expected);
+
+        let args = vec!["", "-l"];
+        let result = Cli::parse_from(args);
+
+        let expected = Cli {
+            phrase: None,
+            example: None,
+            list: true,
+            destroy: None,
+        };
+
+        assert_eq!(result, expected);
+
+        let args = vec!["", "-d", "hello"];
+        let result = Cli::parse_from(args);
+
+        let expected = Cli {
+            phrase: None,
+            example: None,
+            list: false,
+            destroy: Some("hello".to_string()),
         };
 
         assert_eq!(result, expected);
