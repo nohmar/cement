@@ -186,6 +186,10 @@ mod tests {
 
         let result = app.store(conn);
 
+        // FIXME: Spurious failures occur on this test with:
+        // Err(DatabaseError(Unknown, "database is locked"))
+        println!("{:?}", result);
+
         let query_results = idioms
             .filter(phrase.eq(new_phrase))
             .select(Idiom::as_select())
