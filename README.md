@@ -8,6 +8,9 @@ available in Rust's ecosystem. Use at your own risk.
 ## Instructions
 
 ```sh
+# Run migrations with Diesel CLI
+diesel migration run
+
 # Build the binary
 cargo build --release
 
