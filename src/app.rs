@@ -3,6 +3,9 @@ use std::io::ErrorKind;
 use clap::Parser;
 use diesel::{prelude::*, result::Error, sqlite::SqliteConnection};
 
+use diesel::r2d2::ConnectionManager;
+use r2d2::PooledConnection;
+
 use crate::{
     cli::Cli,
     models::{Idiom, NewIdiom},
@@ -39,7 +42,10 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn store(&self, connection: &mut SqliteConnection) -> Result<usize, Error> {
+    pub fn store(
+        &self,
+        connection: &mut PooledConnection<ConnectionManager<SqliteConnection>>,
+    ) -> Result<usize, Error> {
         use crate::schema::idioms;
 
         let phrase = self
@@ -60,7 +66,7 @@ impl<'a> App<'a> {
 
     pub fn destroy(
         &self,
-        connection: &mut SqliteConnection,
+        connection: &mut PooledConnection<ConnectionManager<SqliteConnection>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         use crate::schema::idioms::dsl::*;
         use diesel::prelude::*;
@@ -93,7 +99,7 @@ impl<'a> App<'a> {
 
     pub fn output_from_args(
         &self,
-        connection: &mut SqliteConnection,
+        connection: &mut PooledConnection<ConnectionManager<SqliteConnection>>,
     ) -> Result<String, std::io::Error> {
         use crate::schema::idioms::dsl::*;
 
@@ -136,20 +142,32 @@ impl<'a> App<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::connection::Connection;
     use crate::models::Idiom;
+    use crate::Connection;
     use dotenvy::dotenv;
+    use r2d2::Pool;
     use std::env;
+    use std::sync::OnceLock;
     use std::time::SystemTime;
 
-    fn get_conn() -> Result<SqliteConnection, Box<dyn std::error::Error>> {
+    fn get_pool() -> &'static Pool<ConnectionManager<SqliteConnection>> {
         dotenv().ok();
 
-        let database_url = env::var("TEST_DATABASE_FILE").expect("TEST_DATABASE_FILE must be set");
+        static POOL: OnceLock<Pool<ConnectionManager<SqliteConnection>>> = OnceLock::new();
 
-        Connection::new(Some(&database_url))
-            .state
-            .ok_or(Box::new(std::io::Error::new(ErrorKind::Other, "Failed.")))
+        POOL.get_or_init(|| {
+            let database_url =
+                env::var("TEST_DATABASE_FILE").expect("TEST_DATABASE_FILE must be set");
+            let connection = Connection::new(Some(&database_url));
+            let manager = ConnectionManager::<SqliteConnection>::new(connection.file);
+
+            let pool = r2d2::Pool::builder()
+                .max_size(1)
+                .build(manager)
+                .expect("Failed to create DB pool.");
+
+            pool
+        })
     }
 
     #[test]
@@ -157,8 +175,9 @@ mod tests {
     fn store_errors_without_phrase() {
         let app = App::new(None);
 
-        let conn = &mut get_conn().unwrap();
+        let pool = get_pool();
 
+        let conn = &mut pool.get().unwrap();
         let _ = app.store(conn);
     }
 
@@ -173,16 +192,13 @@ mod tests {
             .as_secs()
             .to_string();
 
+        let pool = get_pool();
+        let conn = &mut pool.get().unwrap();
+
         let new_phrase = "hello-".to_string() + &now;
+        let app_args = vec!["", &new_phrase, "-e", "An example of an example."];
 
-        let app = App::new(Some(vec![
-            "",
-            &new_phrase,
-            "-e",
-            "An example of an example.",
-        ]));
-
-        let conn = &mut get_conn().unwrap();
+        let app = App::new(Some(app_args));
 
         let result = app.store(conn);
 
@@ -201,14 +217,14 @@ mod tests {
     }
 
     #[test]
-    fn output_list_of_idioms() -> Result<(), Box<dyn std::error::Error>> {
+    fn output_list_of_idioms() {
         let args = Some(vec!["", "-l"]);
         let app = App::new(args);
-        let conn = &mut get_conn().unwrap();
 
-        app.output_from_args(conn)?;
+        let pool = get_pool();
+        let conn = &mut pool.get().unwrap();
 
-        Ok(())
+        let _ = app.output_from_args(conn);
     }
 
     #[test]
@@ -228,7 +244,8 @@ mod tests {
             "An example of an example.",
         ]));
 
-        let conn = &mut get_conn().unwrap();
+        let pool = get_pool();
+        let conn = &mut pool.get().unwrap();
 
         let _ = app.store(conn);
 
@@ -253,14 +270,15 @@ mod tests {
             "An example of an example.",
         ]));
 
-        let conn = &mut get_conn().unwrap();
+        let pool = get_pool();
+        let conn = &mut pool.get().unwrap();
 
         app.cli = Cli::parse_from(vec!["", "-d", &new_phrase]);
         let _ = app.destroy(conn);
     }
 
     #[test]
-    fn destory_flag() -> Result<(), Box<dyn std::error::Error>> {
+    fn destory_flag() {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("Unable to get time since Unix epoch.")
@@ -271,10 +289,9 @@ mod tests {
 
         let args = Some(vec!["", "-d", &new_phrase]);
         let app = App::new(args);
-        let conn = &mut get_conn().unwrap();
+        let pool = get_pool();
+        let conn = &mut pool.get().unwrap();
 
-        app.output_from_args(conn)?;
-
-        Ok(())
+        let _ = app.output_from_args(conn);
     }
 }
